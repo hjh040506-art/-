@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "208337969039",
+    "project_id": "closet-26f83",
+    "storage_bucket": "closet-26f83.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:208337969039:android:b70d5bf64fdf8485b3f5fa",
+        "android_client_info": {
+          "package_name": "com.example.mockathon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwlRwaqdbnK6ofvjURXypCdxgnSwSYkgA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
