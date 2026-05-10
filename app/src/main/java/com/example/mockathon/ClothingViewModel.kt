@@ -11,9 +11,15 @@ import androidx.lifecycle.viewModelScope
 import com.example.mockathon.Const.GEMINI_API_KEY
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.segmentation.Segmentation
-import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
+import android.graphics.BitmapFactory
+import com.example.mockathon.Const.REMOVE_BG_API_KEY
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
 class ClothingViewModel : ViewModel() {
@@ -70,56 +76,62 @@ class ClothingViewModel : ViewModel() {
         isRemovingBackground = true
         resultText = "배경 제거 중..."
 
-        val softwareBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // ✅ Bitmap → ByteArray 변환
+                val baos = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                val imageBytes = baos.toByteArray()
 
-        val options = SelfieSegmenterOptions.Builder()
-            .setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
-            .enableRawSizeMask()
-            .build()
-        val segmenter = Segmentation.getClient(options)
-        val inputImage = InputImage.fromBitmap(softwareBitmap, 0)
+                // ✅ OkHttp로 Remove.bg API 호출
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .build()
 
-        segmenter.process(inputImage)
-            .addOnSuccessListener { segmentationMask ->
-                viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
-                    val mask = segmentationMask.buffer
-                    val maskWidth = segmentationMask.width
-                    val maskHeight = segmentationMask.height
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart(
+                        "image_file",
+                        "image.png",
+                        imageBytes.toRequestBody("image/png".toMediaType())
+                    )
+                    .addFormDataPart("size", "auto")
+                    .build()
 
-                    val scaledBitmap = Bitmap.createScaledBitmap(softwareBitmap, maskWidth, maskHeight, true)
-                    val resultBitmap = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ARGB_8888)
+                val request = Request.Builder()
+                    .url("https://api.remove.bg/v1.0/removebg")
+                    .header("X-Api-Key", REMOVE_BG_API_KEY)
+                    .post(requestBody)
+                    .build()
 
-                    mask.rewind()
-                    for (y in 0 until maskHeight) {
-                        for (x in 0 until maskWidth) {
-                            val confidence = mask.float
-                            // ✅ threshold 낮춰서 옷도 어느정도 감지
-                            val alpha = if (confidence > 0.1f) 255 else 0
-                            val pixel = scaledBitmap.getPixel(x, y)
-                            resultBitmap.setPixel(
-                                x, y,
-                                android.graphics.Color.argb(
-                                    alpha,
-                                    android.graphics.Color.red(pixel),
-                                    android.graphics.Color.green(pixel),
-                                    android.graphics.Color.blue(pixel)
-                                )
-                            )
-                        }
-                    }
+                val response = client.newCall(request).execute()
+
+                if (response.isSuccessful) {
+                    val responseBytes = response.body?.bytes()
+                    val resultBitmap = BitmapFactory.decodeByteArray(responseBytes, 0, responseBytes!!.size)
 
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         isRemovingBackground = false
                         selectedImage = resultBitmap
                         analyzeImage(resultBitmap)
                     }
+                } else {
+                    Log.e("ViewModel", "Remove.bg 실패: ${response.code} ${response.message}")
+                    // ✅ 실패 시 원본으로 폴백
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        isRemovingBackground = false
+                        analyzeImage(bitmap)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ViewModel", "누끼 API 오류 → 원본으로 폴백", e)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    isRemovingBackground = false
+                    analyzeImage(bitmap)
                 }
             }
-            .addOnFailureListener { e ->
-                Log.e("ViewModel", "누끼 실패 → 원본으로 폴백", e)
-                isRemovingBackground = false
-                analyzeImage(softwareBitmap)
-            }
+        }
     }
 
 
