@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,7 +52,6 @@ import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 
-// 추천 결과 데이터 클래스
 data class OutfitRecommendation(
     val topImageUrl: String,
     val bottomImageUrl: String,
@@ -71,8 +69,8 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     var recommendation by remember { mutableStateOf<OutfitRecommendation?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var selectedSleeve by remember { mutableStateOf<String?>(null) }   // ✅ 추가
-    var selectedPants by remember { mutableStateOf<String?>(null) }    // ✅ 추가
+    var selectedSleeve by remember { mutableStateOf<String?>(null) }
+    var selectedPants by remember { mutableStateOf<String?>(null) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -119,6 +117,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
             .fillMaxSize()
             .background(Color(0xFFFAF7F4))
     ) {
+        // 상단 바
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -145,7 +144,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -222,7 +221,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(viewModel.closetStyleTags) { category ->
-                            val isSelected = selectedCategory == category && customInput.isBlank()
+                            val isSelected = selectedCategory == category && selectedCategory != "기타"
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
@@ -243,13 +242,67 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                 )
                             }
                         }
+                        // 기타 칩
+                        item {
+                            val isSelected = selectedCategory == "기타"
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
+                                    .clickable {
+                                        selectedCategory = "기타"
+                                        customInput = ""
+                                        recommendation = null
+                                        errorMessage = null
+                                    }
+                                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = "기타",
+                                    color = if (isSelected) Color.White else Color(0xFF666666),
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
                     }
                 }
             }
 
+            // 기타 선택 시 직접 입력칸
+            if (selectedCategory == "기타") {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "어떤 상황인지 입력해주세요",
+                    fontSize = 12.sp,
+                    letterSpacing = 0.5.sp,
+                    color = Color(0xFFB07A6E),
+                    modifier = Modifier.padding(start = 20.dp, bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = customInput,
+                    onValueChange = {
+                        customInput = it
+                        recommendation = null
+                        errorMessage = null
+                    },
+                    placeholder = { Text("예) 소개팅, 헬스장, 편의점", color = Color(0xFFBBAA99)) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF2E1F1A),
+                        unfocusedBorderColor = Color(0xFFD4C4BC),
+                        cursorColor = Color(0xFF2E1F1A),
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White
+                    )
+                )
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ✅ 상의 길이 선택
+            // 상의 길이 선택
             Text(
                 text = "상의 길이",
                 fontSize = 15.sp,
@@ -268,7 +321,6 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                             .clip(RoundedCornerShape(20.dp))
                             .background(if (isSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
                             .clickable {
-                                // ✅ 이미 선택된 것 누르면 해제
                                 selectedSleeve = if (isSelected) null else type
                                 recommendation = null
                             }
@@ -282,27 +334,26 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                         )
                     }
                 }
-                // ✅ 선택 안함 칩
-                val isNoneSelected = selectedSleeve == null
+                val isNoneSleeveSelected = selectedSleeve == null
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(if (isNoneSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
+                        .background(if (isNoneSleeveSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
                         .clickable { selectedSleeve = null; recommendation = null }
                         .padding(horizontal = 18.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = "상관없음",
-                        color = if (isNoneSelected) Color.White else Color(0xFF666666),
+                        color = if (isNoneSleeveSelected) Color.White else Color(0xFF666666),
                         fontSize = 13.sp,
-                        fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (isNoneSleeveSelected) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ✅ 하의 길이 선택
+            // 하의 길이 선택
             Text(
                 text = "하의 길이",
                 fontSize = 15.sp,
@@ -334,60 +385,28 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                         )
                     }
                 }
-                val isNoneSelected = selectedPants == null
+                val isNonePantsSelected = selectedPants == null
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(if (isNoneSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
+                        .background(if (isNonePantsSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
                         .clickable { selectedPants = null; recommendation = null }
                         .padding(horizontal = 18.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = "상관없음",
-                        color = if (isNoneSelected) Color.White else Color(0xFF666666),
+                        color = if (isNonePantsSelected) Color.White else Color(0xFF666666),
                         fontSize = 13.sp,
-                        fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (isNonePantsSelected) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 직접 입력
-            Text(
-                text = "또는 직접 입력해보세요",
-                fontSize = 12.sp,
-                letterSpacing = 0.5.sp,
-                color = Color(0xFFB07A6E),
-                modifier = Modifier.padding(start = 20.dp, bottom = 8.dp)
-            )
-            OutlinedTextField(
-                value = customInput,
-                onValueChange = {
-                    customInput = it
-                    if (it.isNotBlank()) {
-                        selectedCategory = it.trim()
-                        recommendation = null
-                        errorMessage = null
-                    }
-                },
-                placeholder = { Text("예) 소개팅, 헬스장, 편의점", color = Color(0xFFBBAA99)) },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF2E1F1A),
-                    unfocusedBorderColor = Color(0xFFD4C4BC),
-                    cursorColor = Color(0xFF2E1F1A),
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White
-                )
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
             // 추천받기 버튼
-            val hasInput = selectedCategory != null || customInput.isNotBlank()
+            val hasInput = (selectedCategory != null && selectedCategory != "기타") ||
+                    (selectedCategory == "기타" && customInput.isNotBlank())
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -396,15 +415,15 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                     .clip(RoundedCornerShape(18.dp))
                     .background(if (hasInput && !isLoading) Color(0xFFB07A6E) else Color(0xFFD4C4BC))
                     .clickable(enabled = hasInput && !isLoading) {
-                        val category = if (customInput.isNotBlank()) customInput.trim() else selectedCategory
+                        val category = if (selectedCategory == "기타") customInput.trim() else selectedCategory
                         category?.let {
                             isLoading = true
                             errorMessage = null
                             recommendation = null
                             viewModel.getOutfitRecommendation(
                                 category = it,
-                                sleeveType = selectedSleeve,   // ✅ 전달
-                                pantsType = selectedPants      // ✅ 전달
+                                sleeveType = selectedSleeve,
+                                pantsType = selectedPants
                             ) { result, error ->
                                 isLoading = false
                                 recommendation = result
@@ -423,7 +442,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 } else {
                     Text(
                         text = if (!hasInput) "카테고리를 먼저 선택해주세요"
-                        else "${if (customInput.isNotBlank()) customInput.trim() else selectedCategory!!} 코디 추천받기",
+                        else "${if (selectedCategory == "기타") customInput.trim() else selectedCategory!!} 코디 추천받기",
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
@@ -450,9 +469,9 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
             recommendation?.let { outfit ->
                 OutfitCard(
                     outfit = outfit,
-                    category = if (customInput.isNotBlank()) customInput.trim() else selectedCategory ?: "",
+                    category = if (selectedCategory == "기타") customInput.trim() else selectedCategory ?: "",
                     onRefresh = {
-                        val category = if (customInput.isNotBlank()) customInput.trim() else selectedCategory
+                        val category = if (selectedCategory == "기타") customInput.trim() else selectedCategory
                         category?.let {
                             isLoading = true
                             recommendation = null
@@ -489,7 +508,6 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     }
 }
 
-
 @Composable
 fun OutfitCard(
     outfit: OutfitRecommendation,
@@ -508,19 +526,8 @@ fun OutfitCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(
-                    text = "✦ TODAY'S PICK",
-                    fontSize = 11.sp,
-                    letterSpacing = 2.sp,
-                    color = Color(0xFFB07A6E),
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "$category 코디",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2E1F1A)
-                )
+                Text(text = "✦ TODAY'S PICK", fontSize = 11.sp, letterSpacing = 2.sp, color = Color(0xFFB07A6E), fontWeight = FontWeight.Medium)
+                Text(text = "$category 코디", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E1F1A))
             }
             Box(
                 modifier = Modifier
@@ -584,10 +591,7 @@ fun OutfitCard(
             contentAlignment = Alignment.Center
         ) {
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF2E1F1A)),
+                modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF2E1F1A)),
                 contentAlignment = Alignment.Center
             ) {
                 Text("+", fontSize = 18.sp, color = Color.White, fontWeight = FontWeight.Bold)
@@ -623,43 +627,34 @@ fun OutfitCard(
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                             .align(Alignment.TopStart)
                     ) {
-                        Text(
-                            "하의",
-                            fontSize = 11.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("하의", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // AI 추천 이유
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFF2E1F1A))
-                    .padding(18.dp)
-            ) {
-                Column {
-                    Text(
-                        text = "✦ AI 추천 이유",
-                        fontSize = 11.sp,
-                        letterSpacing = 1.sp,
-                        color = Color(0xFFB07A6E),
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = outfit.reason,
-                        fontSize = 14.sp,
-                        color = Color(0xFFEDE0D8),
-                        lineHeight = 22.sp
-                    )
-                }
+                Text(
+                    text = outfit.bottomTags,
+                    fontSize = 11.sp,
+                    color = Color(0xFF888888),
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                )
             }
         }
+
+        // ✅ AI 추천 이유 — 하의 아래
+        Spacer(modifier = Modifier.height(14.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xFF2E1F1A))
+                .padding(18.dp)
+        ) {
+            Column {
+                Text(text = "✦ AI 추천 이유", fontSize = 11.sp, letterSpacing = 1.sp, color = Color(0xFFB07A6E), fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = outfit.reason, fontSize = 14.sp, color = Color(0xFFEDE0D8), lineHeight = 22.sp)
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
     }
 }
