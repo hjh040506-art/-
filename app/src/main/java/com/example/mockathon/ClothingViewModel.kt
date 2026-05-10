@@ -149,20 +149,18 @@ class ClothingViewModel : ViewModel() {
                     generativeModel.generateContent(content {
                         image(bitmap)
                         text("""
-                            이 옷 사진을 분석해서 아래 형식에 맞춰 정확히 5줄로만 출력해줘. 다른 말은 하지 마.
+                            이 옷 사진을 분석해서 아래 형식에 맞춰 정확히 4줄로만 출력해줘. 다른 말은 하지 마.
                             
                             1줄: 옷 종류 (예: #긴팔후드티, #반팔티셔츠, #청바지, #반바지, #니트 등)
                             2줄: 색깔 (예: #검은색, #흰색, #네이비 등)
                             3줄: 계절 — 반드시 #봄 #여름 #가을 #겨울 중에서 해당하는 것만 골라서 출력해. 복수 가능 (예: #가을 #겨울)
                             4줄: 스타일 (예: #캐주얼, #스트릿, #오피스룩, #스포츠 등)
-                            5줄: 컨셉 — 재밌고 공감가게 (예: #남친이벤트용, #길가다번호따임, #공대생, #여친생김)
                             
                             예시 출력:
                             #긴팔후드티
                             #검은색
                             #가을 #겨울
                             #캐주얼
-                            #공대생
                             
                             만약 사진이 옷이 아니면 재치있게 한 줄로 설명하고 반드시 "이전을 눌러 다시 업로드 해주세요"라는 말을 포함해줘.
                         """.trimIndent())
@@ -194,7 +192,19 @@ class ClothingViewModel : ViewModel() {
             onComplete(success)
         }
     }
+    var closetStyleTags by mutableStateOf<List<String>>(emptyList())
 
+    fun loadClosetStyleTags() {
+        repository.getAllClothes(
+            onResult = { clothes ->
+                closetStyleTags = clothes.mapNotNull { item ->
+                    val tags = item["tags"]?.toString() ?: ""
+                    tags.lines().getOrNull(3)?.trim()?.replace("#", "")?.trim()?.takeIf { it.isNotEmpty() }
+                }.distinct()
+            },
+            onError = { Log.e("ViewModel", "스타일 태그 로드 실패") }
+        )
+    }
     fun loadWishlist(onResult: (List<Map<String, Any>>) -> Unit, onError: (() -> Unit)? = null) {
         repository.getWishlist(
             onResult = onResult,
@@ -258,6 +268,8 @@ class ClothingViewModel : ViewModel() {
 
     fun getOutfitRecommendation(
         category: String,
+        sleeveType: String?,   // ✅ "긴팔" | "반팔" | null
+        pantsType: String?,    // ✅ "긴바지" | "반바지" | null
         onResult: (OutfitRecommendation?, String?) -> Unit
     ) {
         viewModelScope.launch {
@@ -340,25 +352,32 @@ class ClothingViewModel : ViewModel() {
                                 "현재 날씨: ${it.emoji} ${it.description}, 기온: ${it.tempCelsius}°C"
                             } ?: "날씨 정보 없음"
 
+                            val sleeveContext = sleeveType?.let { "상의는 반드시 $it 이어야 해." } ?: ""
+                            val pantsContext = pantsType?.let { "하의는 반드시 $it 이어야 해." } ?: ""
+
                             val prompt = """
-                                너는 패션 코디 전문가야.
-                                아래 옷 목록에서 "$category" 스타일에 가장 잘 어울리는 상의 1개와 하의 1개를 골라줘.
-                                
-                                [오늘의 날씨]
-                                $weatherContext
-                                날씨와 기온을 반드시 고려해서 추천해줘.
-                                
-                                [상의 목록]
-                                $topList
-                                
-                                [하의 목록]
-                                $bottomList
-                                
-                                반드시 아래 형식으로만 답해줘. 다른 말은 하지 마:
-                                TOP_ID: (선택한 상의의 id값)
-                                BOTTOM_ID: (선택한 하의의 id값)
-                                REASON: (추천 이유를 2~3문장으로, 날씨 언급 포함해서 재치있고 친근하게)
-                            """.trimIndent()
+                                    너는 패션 코디 전문가야.
+                                    아래 옷 목록에서 "$category" 스타일에 가장 잘 어울리는 상의 1개와 하의 1개를 골라줘.
+                                    
+                                    [오늘의 날씨]
+                                    $weatherContext
+                                    날씨와 기온을 반드시 고려해서 추천해줘.
+                                    
+                                    [추가 조건]
+                                    $sleeveContext
+                                    $pantsContext
+                                    
+                                    [상의 목록]
+                                    $topList
+                                    
+                                    [하의 목록]
+                                    $bottomList
+                                    
+                                    반드시 아래 형식으로만 답해줘. 다른 말은 하지 마:
+                                    TOP_ID: (선택한 상의의 id값)
+                                    BOTTOM_ID: (선택한 하의의 id값)
+                                    REASON: (추천 이유를 2~3문장으로, 날씨 언급 포함해서 재치있고 친근하게)
+                                """.trimIndent()
 
                             viewModelScope.launch {
                                 try {

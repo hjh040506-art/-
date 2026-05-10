@@ -53,12 +53,6 @@ import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 
-// 카테고리 목록
-val RECOMMEND_CATEGORIES = listOf(
-    "캐주얼", "데이트", "여름", "가을", "겨울",
-    "오피스룩", "스포츠", "파티", "봄", "올블랙"
-)
-
 // 추천 결과 데이터 클래스
 data class OutfitRecommendation(
     val topImageUrl: String,
@@ -77,8 +71,9 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     var recommendation by remember { mutableStateOf<OutfitRecommendation?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var selectedSleeve by remember { mutableStateOf<String?>(null) }   // ✅ 추가
+    var selectedPants by remember { mutableStateOf<String?>(null) }    // ✅ 추가
 
-    // GPS 권한 요청 launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -98,12 +93,11 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
         }
     }
 
-    // 화면 진입 시 날씨 자동 로드
     LaunchedEffect(Unit) {
+        viewModel.loadClosetStyleTags()
         val hasPermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
-
         if (hasPermission) {
             val fusedClient = LocationServices.getFusedLocationProviderClient(context)
             val request = CurrentLocationRequest.Builder()
@@ -125,7 +119,6 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
             .fillMaxSize()
             .background(Color(0xFFFAF7F4))
     ) {
-        // 상단 바
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -145,19 +138,8 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
             }
             Spacer(modifier = Modifier.width(14.dp))
             Column {
-                Text(
-                    text = "✦ STYLE AI",
-                    fontSize = 11.sp,
-                    letterSpacing = 2.sp,
-                    color = Color(0xFFB07A6E),
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "오늘의 코디 추천",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2E1F1A)
-                )
+                Text(text = "✦ STYLE AI", fontSize = 11.sp, letterSpacing = 2.sp, color = Color(0xFFB07A6E), fontWeight = FontWeight.Medium)
+                Text(text = "오늘의 코디 추천", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E1F1A))
             }
         }
 
@@ -168,7 +150,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ── 날씨 카드 ──
+            // 날씨 카드
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -180,11 +162,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 when {
                     viewModel.isWeatherLoading || (!viewModel.weatherError && viewModel.weatherInfo == null) -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = Color(0xFFEDE0D8)
-                            )
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFFEDE0D8))
                             Spacer(modifier = Modifier.width(10.dp))
                             Text("날씨 불러오는 중...", fontSize = 14.sp, color = Color(0xFFBBAA99))
                         }
@@ -198,17 +176,8 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                             Text(w.emoji, fontSize = 36.sp)
                             Spacer(modifier = Modifier.width(14.dp))
                             Column {
-                                Text(
-                                    text = "${w.tempCelsius}°C",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = w.description,
-                                    fontSize = 13.sp,
-                                    color = Color(0xFFBBAA99)
-                                )
+                                Text(text = "${w.tempCelsius}°C", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(text = w.description, fontSize = 13.sp, color = Color(0xFFBBAA99))
                             }
                             Spacer(modifier = Modifier.weight(1f))
                             Box(
@@ -217,11 +186,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                     .background(Color(0x33FFFFFF))
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
-                                Text(
-                                    "날씨 반영됨",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFFEDE0D8)
-                                )
+                                Text("날씨 반영됨", fontSize = 11.sp, color = Color(0xFFEDE0D8))
                             }
                         }
                     }
@@ -230,7 +195,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 카테고리 라벨
+            // 스타일 카테고리
             Text(
                 text = "어떤 스타일로 입을까요?",
                 fontSize = 15.sp,
@@ -238,37 +203,155 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 color = Color(0xFF2E1F1A),
                 modifier = Modifier.padding(start = 20.dp, bottom = 12.dp)
             )
+            when {
+                viewModel.closetStyleTags.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFFEDE0D8))
+                            .padding(16.dp)
+                    ) {
+                        Text("옷장에 옷을 등록하면\n스타일 카테고리가 자동으로 나타나요 👕", fontSize = 13.sp, color = Color(0xFF888888), lineHeight = 20.sp)
+                    }
+                }
+                else -> {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(viewModel.closetStyleTags) { category ->
+                            val isSelected = selectedCategory == category && customInput.isBlank()
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
+                                    .clickable {
+                                        selectedCategory = category
+                                        customInput = ""
+                                        recommendation = null
+                                        errorMessage = null
+                                    }
+                                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = category,
+                                    color = if (isSelected) Color.White else Color(0xFF666666),
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
-            // 카테고리 칩
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ✅ 상의 길이 선택
+            Text(
+                text = "상의 길이",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF2E1F1A),
+                modifier = Modifier.padding(start = 20.dp, bottom = 10.dp)
+            )
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(RECOMMEND_CATEGORIES) { category ->
-                    val isSelected = selectedCategory == category && customInput.isBlank()
+                listOf("긴팔", "반팔").forEach { type ->
+                    val isSelected = selectedSleeve == type
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .background(if (isSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
                             .clickable {
-                                selectedCategory = category
-                                customInput = ""
+                                // ✅ 이미 선택된 것 누르면 해제
+                                selectedSleeve = if (isSelected) null else type
                                 recommendation = null
-                                errorMessage = null
                             }
                             .padding(horizontal = 18.dp, vertical = 10.dp)
                     ) {
                         Text(
-                            text = category,
+                            text = type,
                             color = if (isSelected) Color.White else Color(0xFF666666),
                             fontSize = 13.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
                     }
                 }
+                // ✅ 선택 안함 칩
+                val isNoneSelected = selectedSleeve == null
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (isNoneSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
+                        .clickable { selectedSleeve = null; recommendation = null }
+                        .padding(horizontal = 18.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = "상관없음",
+                        color = if (isNoneSelected) Color.White else Color(0xFF666666),
+                        fontSize = 13.sp,
+                        fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ✅ 하의 길이 선택
+            Text(
+                text = "하의 길이",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF2E1F1A),
+                modifier = Modifier.padding(start = 20.dp, bottom = 10.dp)
+            )
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("긴바지", "반바지").forEach { type ->
+                    val isSelected = selectedPants == type
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
+                            .clickable {
+                                selectedPants = if (isSelected) null else type
+                                recommendation = null
+                            }
+                            .padding(horizontal = 18.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = type,
+                            color = if (isSelected) Color.White else Color(0xFF666666),
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+                val isNoneSelected = selectedPants == null
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (isNoneSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
+                        .clickable { selectedPants = null; recommendation = null }
+                        .padding(horizontal = 18.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = "상관없음",
+                        color = if (isNoneSelected) Color.White else Color(0xFF666666),
+                        fontSize = 13.sp,
+                        fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             // 직접 입력
             Text(
@@ -318,7 +401,11 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                             isLoading = true
                             errorMessage = null
                             recommendation = null
-                            viewModel.getOutfitRecommendation(it) { result, error ->
+                            viewModel.getOutfitRecommendation(
+                                category = it,
+                                sleeveType = selectedSleeve,   // ✅ 전달
+                                pantsType = selectedPants      // ✅ 전달
+                            ) { result, error ->
                                 isLoading = false
                                 recommendation = result
                                 errorMessage = error
@@ -346,7 +433,6 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 에러 메시지
             errorMessage?.let { msg ->
                 Box(
                     modifier = Modifier
@@ -356,18 +442,11 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                         .background(Color(0xFFFFF0EE))
                         .padding(16.dp)
                 ) {
-                    Text(
-                        text = msg,
-                        color = Color(0xFFCC4444),
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Text(text = msg, color = Color(0xFFCC4444), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // 코디 카드
             recommendation?.let { outfit ->
                 OutfitCard(
                     outfit = outfit,
@@ -377,7 +456,11 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                         category?.let {
                             isLoading = true
                             recommendation = null
-                            viewModel.getOutfitRecommendation(it) { result, error ->
+                            viewModel.getOutfitRecommendation(
+                                category = it,
+                                sleeveType = selectedSleeve,
+                                pantsType = selectedPants
+                            ) { result, error ->
                                 isLoading = false
                                 recommendation = result
                                 errorMessage = error
@@ -387,12 +470,9 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 )
             }
 
-            // 빈 상태
             if (recommendation == null && !isLoading && errorMessage == null) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 48.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -408,6 +488,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
         }
     }
 }
+
 
 @Composable
 fun OutfitCard(
