@@ -46,7 +46,6 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 MediaStore.Images.Media.getBitmap(context.contentResolver, it)
             } else {
                 val source = ImageDecoder.createSource(context.contentResolver, it)
-                // ✅ Software Bitmap으로 강제 디코딩
                 ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                 }
@@ -56,19 +55,21 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
         }
     }
 
-
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
             capturedImage = bitmap
-            viewModel.removeBackgroundAndAnalyze(bitmap)  // ✅ 누끼 후 분석
+            viewModel.removeBackgroundAndAnalyze(bitmap)
         }
     }
 
-    if (capturedImage != null) {
+    // ✅ 누끼 완료 후 viewModel.selectedImage로 교체, 없으면 원본 사용
+    val displayBitmap = viewModel.selectedImage ?: capturedImage
+
+    if (displayBitmap != null) {
         ResultView(
-            bitmap = capturedImage!!,
+            bitmap = displayBitmap,  // ✅ 누끼 완료 이미지 전달
             viewModel = viewModel,
             onClose = {
                 capturedImage = null

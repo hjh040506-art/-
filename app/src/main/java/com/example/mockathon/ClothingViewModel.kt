@@ -70,7 +70,6 @@ class ClothingViewModel : ViewModel() {
         isRemovingBackground = true
         resultText = "배경 제거 중..."
 
-        // ✅ Hardware Bitmap → Software Bitmap 변환
         val softwareBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
 
         val options = SelfieSegmenterOptions.Builder()
@@ -82,7 +81,6 @@ class ClothingViewModel : ViewModel() {
 
         segmenter.process(inputImage)
             .addOnSuccessListener { segmentationMask ->
-                // ✅ 픽셀 루프를 백그라운드 스레드에서 실행
                 viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
                     val mask = segmentationMask.buffer
                     val maskWidth = segmentationMask.width
@@ -95,7 +93,8 @@ class ClothingViewModel : ViewModel() {
                     for (y in 0 until maskHeight) {
                         for (x in 0 until maskWidth) {
                             val confidence = mask.float
-                            val alpha = (confidence * 255).toInt().coerceIn(0, 255)
+                            // ✅ threshold 낮춰서 옷도 어느정도 감지
+                            val alpha = if (confidence > 0.1f) 255 else 0
                             val pixel = scaledBitmap.getPixel(x, y)
                             resultBitmap.setPixel(
                                 x, y,
@@ -109,7 +108,6 @@ class ClothingViewModel : ViewModel() {
                         }
                     }
 
-                    // ✅ UI 업데이트는 메인 스레드로 복귀
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         isRemovingBackground = false
                         selectedImage = resultBitmap
@@ -123,6 +121,8 @@ class ClothingViewModel : ViewModel() {
                 analyzeImage(softwareBitmap)
             }
     }
+
+
 
     fun analyzeImage(bitmap: Bitmap) {
         selectedImage = bitmap
