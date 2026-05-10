@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -242,14 +243,14 @@ fun ClosetScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(170.dp)
+                                        .wrapContentHeight()
                                         .background(Color(0xFFF0E8E3))
                                 ) {
                                     AsyncImage(
                                         model = imageUrl,
                                         contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentScale = ContentScale.FillWidth
                                     )
                                     if (isDeleteMode && isSelected) {
                                         Box(modifier = Modifier.fillMaxSize().background(Color(0x55B07A6E)))
@@ -376,11 +377,16 @@ fun DetailView(item: Map<String, Any>, onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .height(360.dp)
+                .wrapContentHeight()
                 .clip(RoundedCornerShape(24.dp))
                 .background(Color(0xFFEDE0D8))
         ) {
-            AsyncImage(model = item["imageUrl"] as? String ?: "", contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            AsyncImage(
+                model = item["imageUrl"] as? String ?: "",
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth(),
+                contentScale = ContentScale.FillWidth
+            )
         }
         Spacer(modifier = Modifier.height(16.dp))
         Box(

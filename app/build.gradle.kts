@@ -83,6 +83,7 @@ dependencies {
     implementation(libs.firebase.storage.ktx)
     implementation(libs.identity.jvm)
     implementation(libs.androidx.media3.effect)
+    implementation(libs.androidx.compose.foundation.layout)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

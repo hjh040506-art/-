@@ -208,14 +208,14 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(170.dp)
+                                        .wrapContentHeight()
                                         .background(Color(0xFFF0E8E3))
                                 ) {
                                     AsyncImage(
                                         model = imageUrl,
                                         contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentScale = ContentScale.FillWidth
                                     )
                                     if (isEditMode && isSelected) {
                                         Box(modifier = Modifier.fillMaxSize().background(Color(0x55B07A6E)))

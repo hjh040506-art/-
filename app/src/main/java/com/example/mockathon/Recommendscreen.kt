@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -465,15 +466,15 @@ fun OutfitCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
+                        .wrapContentHeight()
                         .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                         .background(Color(0xFFEDE0D8))
                 ) {
                     AsyncImage(
                         model = outfit.topImageUrl,
                         contentDescription = "상의",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Box(
                         modifier = Modifier
@@ -523,15 +524,15 @@ fun OutfitCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
+                        .wrapContentHeight()
                         .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                         .background(Color(0xFFEDE0D8))
                 ) {
                     AsyncImage(
                         model = outfit.bottomImageUrl,
                         contentDescription = "하의",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Box(
                         modifier = Modifier
@@ -541,44 +542,42 @@ fun OutfitCard(
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                             .align(Alignment.TopStart)
                     ) {
-                        Text("하의", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            "하의",
+                            fontSize = 11.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
-                Text(
-                    text = outfit.bottomTags,
-                    fontSize = 11.sp,
-                    color = Color(0xFF888888),
-                    maxLines = 1,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                )
             }
-        }
 
-        Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-        // AI 추천 이유
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(Color(0xFF2E1F1A))
-                .padding(18.dp)
-        ) {
-            Column {
-                Text(
-                    text = "✦ AI 추천 이유",
-                    fontSize = 11.sp,
-                    letterSpacing = 1.sp,
-                    color = Color(0xFFB07A6E),
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = outfit.reason,
-                    fontSize = 14.sp,
-                    color = Color(0xFFEDE0D8),
-                    lineHeight = 22.sp
-                )
+            // AI 추천 이유
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF2E1F1A))
+                    .padding(18.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "✦ AI 추천 이유",
+                        fontSize = 11.sp,
+                        letterSpacing = 1.sp,
+                        color = Color(0xFFB07A6E),
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = outfit.reason,
+                        fontSize = 14.sp,
+                        color = Color(0xFFEDE0D8),
+                        lineHeight = 22.sp
+                    )
+                }
             }
         }
     }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -197,15 +198,15 @@ fun ResultView(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(360.dp)
+                    .wrapContentHeight()             // ✅ 이미지 높이에 맞게 자동 조절
                     .clip(RoundedCornerShape(24.dp))
                     .background(Color(0xFFEDE0D8))
             ) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = "선택된 옷 사진",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.FillWidth  // ✅ 가로 꽉 채우고 세로 비율 유지
                 )
             }
 
