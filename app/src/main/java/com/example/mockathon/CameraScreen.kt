@@ -46,12 +46,16 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 MediaStore.Images.Media.getBitmap(context.contentResolver, it)
             } else {
                 val source = ImageDecoder.createSource(context.contentResolver, it)
-                ImageDecoder.decodeBitmap(source)
+                // ✅ Software Bitmap으로 강제 디코딩
+                ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                }
             }
             capturedImage = bitmap
-            viewModel.removeBackgroundAndAnalyze(bitmap)  // ✅ 누끼 후 분석
+            viewModel.removeBackgroundAndAnalyze(bitmap)
         }
     }
+
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()

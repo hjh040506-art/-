@@ -70,43 +70,57 @@ class ClothingViewModel : ViewModel() {
         isRemovingBackground = true
         resultText = "배경 제거 중..."
 
+        // ✅ Hardware Bitmap → Software Bitmap 변환
+        val softwareBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+
         val options = SelfieSegmenterOptions.Builder()
             .setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
             .enableRawSizeMask()
             .build()
         val segmenter = Segmentation.getClient(options)
-        val inputImage = InputImage.fromBitmap(bitmap, 0)
+        val inputImage = InputImage.fromBitmap(softwareBitmap, 0)
 
         segmenter.process(inputImage)
             .addOnSuccessListener { segmentationMask ->
-                val mask = segmentationMask.buffer
-                val maskWidth = segmentationMask.width
-                val maskHeight = segmentationMask.height
+                // ✅ 픽셀 루프를 백그라운드 스레드에서 실행
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                    val mask = segmentationMask.buffer
+                    val maskWidth = segmentationMask.width
+                    val maskHeight = segmentationMask.height
 
-                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, maskWidth, maskHeight, true)
-                val resultBitmap = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ARGB_8888)
+                    val scaledBitmap = Bitmap.createScaledBitmap(softwareBitmap, maskWidth, maskHeight, true)
+                    val resultBitmap = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ARGB_8888)
 
-                mask.rewind()
-                for (y in 0 until maskHeight) {
-                    for (x in 0 until maskWidth) {
-                        val confidence = mask.float
-                        val alpha = (confidence * 255).toInt().coerceIn(0, 255)
-                        val pixel = scaledBitmap.getPixel(x, y)
-                        resultBitmap.setPixel(
-                            x, y,
-                            Color.argb(alpha, Color.red(pixel), Color.green(pixel), Color.blue(pixel))
-                        )
+                    mask.rewind()
+                    for (y in 0 until maskHeight) {
+                        for (x in 0 until maskWidth) {
+                            val confidence = mask.float
+                            val alpha = (confidence * 255).toInt().coerceIn(0, 255)
+                            val pixel = scaledBitmap.getPixel(x, y)
+                            resultBitmap.setPixel(
+                                x, y,
+                                android.graphics.Color.argb(
+                                    alpha,
+                                    android.graphics.Color.red(pixel),
+                                    android.graphics.Color.green(pixel),
+                                    android.graphics.Color.blue(pixel)
+                                )
+                            )
+                        }
+                    }
+
+                    // ✅ UI 업데이트는 메인 스레드로 복귀
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        isRemovingBackground = false
+                        selectedImage = resultBitmap
+                        analyzeImage(resultBitmap)
                     }
                 }
-
-                isRemovingBackground = false
-                selectedImage = resultBitmap
-                analyzeImage(resultBitmap)
             }
-            .addOnFailureListener {
-                Log.e("ViewModel", "누끼 실패 → 원본으로 폴백", it)
+            .addOnFailureListener { e ->
+                Log.e("ViewModel", "누끼 실패 → 원본으로 폴백", e)
                 isRemovingBackground = false
-                analyzeImage(bitmap)
+                analyzeImage(softwareBitmap)
             }
     }
 
