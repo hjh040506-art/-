@@ -22,8 +22,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -360,7 +362,12 @@ fun FilterSection(label: String, filters: List<String>, selectedFilter: String, 
 
 @Composable
 fun DetailView(item: Map<String, Any>, onBack: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFFAF7F4))) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFAF7F4))
+            .verticalScroll(rememberScrollState())  // ✅ 추가
+    ) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -390,9 +397,15 @@ fun DetailView(item: Map<String, Any>, onBack: () -> Unit) {
         }
         Spacer(modifier = Modifier.height(16.dp))
         Box(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White)
+                .padding(16.dp)
         ) {
             Text(item["tags"]?.toString() ?: "", fontSize = 14.sp, color = Color(0xFF555555), lineHeight = 22.sp)
         }
+        Spacer(modifier = Modifier.height(40.dp))
     }
 }
