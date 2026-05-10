@@ -1,5 +1,6 @@
-package com.example.mockathon // 본인의 패키지명 확인 필수!
+package com.example.mockathon
 //UI함수
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.Toast
@@ -9,10 +10,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,32 +54,31 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: ClothingViewModel by viewModels()
 
-            // 상태 변수들을 이곳에 선언합니다.
             var currentScreen by remember { mutableStateOf(0) }
-            // 클릭된 아이템을 저장하는 변수
             var selectedItem by remember { mutableStateOf<Map<String, Any>?>(null) }
 
-            // 화면 분기 처리
             when (currentScreen) {
-                0 -> MainScreen(
-                    onNavigateToCloset = { currentScreen = 2 },
-                    onNavigateToAnalyze = { currentScreen = 1 }
-                )
-                1 -> ClothingScreen(
+                0 -> MainScreen(onNavigate = { currentScreen = it })
+                1 -> ClosetScreen(
                     viewModel = viewModel,
-                    onBack = { currentScreen = 0 } // 뒤로 가기 버튼을 누르면 메인(0번)으로 이동!
-                )
-                2 -> ClosetScreen(
-                    viewModel = viewModel,
-                    onBack = { currentScreen = 0 }, // 이전 버튼 누르면 메인(0번)으로!
+                    onBack = { currentScreen = 0 },
                     onItemClick = { item ->
-                        selectedItem = item
-                        currentScreen = 3
+                        println("선택된 아이템: ${item["id"]}")
                     }
                 )
-                3 -> selectedItem?.let { item ->
-                    DetailView(item = item) { currentScreen = 2 } // 뒤로가면 옷장으로
-                }
+                2 -> CameraScreen(
+                    viewModel = viewModel,
+                    onBack = { currentScreen = 0 }
+                )
+                3 -> WishlistScreen(
+                    viewModel = viewModel,
+                    onBack = { currentScreen = 0 }
+                )
+                // ✅ 추천 화면 추가
+                4 -> RecommendScreen(
+                    viewModel = viewModel,
+                    onBack = { currentScreen = 0 }
+                )
             }
         }
     }
@@ -76,15 +86,21 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ClothingScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
-    if (viewModel.selectedImage == null) {
-        // InitialView 안에 "뒤로가기" 버튼을 추가하거나 처리해야 합니다.
-        InitialView(viewModel,onBack = onBack)
+    val selectedBitmap = viewModel.selectedImage
+    if (selectedBitmap == null) {
+        InitialView(viewModel, onBack = onBack)
     } else {
-        ResultView(viewModel)
+        ResultView(
+            bitmap = selectedBitmap,
+            viewModel = viewModel,
+            onClose = {
+                viewModel.selectedImage = null
+                onBack()
+            }
+        )
     }
 }
 
-// 1. 초기 화면 함수
 @Composable
 fun InitialView(viewModel: ClothingViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -100,15 +116,12 @@ fun InitialView(viewModel: ClothingViewModel, onBack: () -> Unit) {
             .background(Color(0xFF996666))
             .padding(16.dp)
     ) {
-        // 1. 이전 버튼 (왼쪽 상단 고정)
         Button(
             onClick = onBack,
             modifier = Modifier.align(Alignment.TopStart)
         ) {
             Text("이전")
         }
-
-        // 2. 텍스트와 버튼 (화면 정중앙 배치)
         Column(
             modifier = Modifier.align(Alignment.Center),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -130,95 +143,373 @@ fun InitialView(viewModel: ClothingViewModel, onBack: () -> Unit) {
     }
 }
 
-// 2. 결과 화면 함수
 @Composable
-fun ResultView(viewModel: ClothingViewModel) {
+fun ResultView(
+    bitmap: Bitmap,
+    viewModel: ClothingViewModel,
+    onClose: () -> Unit
+) {
     val context = LocalContext.current
+    var savedToCloset by remember { mutableStateOf(false) }
+    var savedToWishlist by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF996666))
-            .padding(16.dp)
+            .background(Color(0xFFFAF7F4))
     ) {
-        Button(onClick = { viewModel.resetToInitial() }) {
-            Text("이전")
+        // 상단 바
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFEDE0D8))
+                    .clickable {
+                        viewModel.resetToInitial()
+                        onClose()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("←", fontSize = 18.sp, color = Color(0xFF2E1F1A))
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "옷 분석 결과",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF2E1F1A)
+            )
         }
 
-        Spacer(modifier = Modifier.height(50.dp))
-
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            viewModel.selectedImage?.let { bitmap ->
+            // 사진 카드
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(360.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFFEDE0D8))
+            ) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = "선택된 옷 사진",
-                    modifier = Modifier.size(350.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-                Text(
-                    text = viewModel.resultText,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(16.dp)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // [이제 코드가 훨씬 직관적입니다!]
+            // 분석 결과 카드
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White)
+                    .padding(20.dp)
+            ) {
                 when {
                     viewModel.isAnalyzing -> {
-                        CircularProgressIndicator(color = Color.White)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFFB07A6E),
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                "AI가 분석 중이에요...",
+                                fontSize = 15.sp,
+                                color = Color(0xFF888888)
+                            )
+                        }
+                    }
+                    viewModel.isError -> {
+                        Text(
+                            text = viewModel.resultText,
+                            color = Color(0xFFCC5555),
+                            fontSize = 14.sp
+                        )
                     }
                     viewModel.isAnalysisFinished && viewModel.isClothing -> {
-                        // 분석이 완료되었고 옷일 때만 저장 버튼 표시
-                        Button(
-                            onClick = {
-                                viewModel.saveToCloset(bitmap, viewModel.resultText) { success ->
-                                    if (success) {
-                                        Toast.makeText(context, "저장 완료!", Toast.LENGTH_SHORT).show()
-                                        viewModel.resetToInitial()
-                                    } else {
-                                        Toast.makeText(context, "저장 실패.", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                            enabled = !viewModel.isSaving
-                        ) {
-                            Text(if (viewModel.isSaving) "저장 중..." else "옷장에 저장하기")
+                        Column {
+                            Text(
+                                text = "✦ 분석 완료",
+                                fontSize = 12.sp,
+                                letterSpacing = 2.sp,
+                                color = Color(0xFFB07A6E),
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = viewModel.resultText,
+                                fontSize = 15.sp,
+                                color = Color(0xFF2E1F1A),
+                                lineHeight = 24.sp
+                            )
                         }
                     }
                     viewModel.isAnalysisFinished && !viewModel.isClothing -> {
-                        // 옷이 아닐 때 안내 문구
-                        Text("사진을 다시 확인해주세요.", color = Color.White)
+                        Text(
+                            text = viewModel.resultText,
+                            fontSize = 15.sp,
+                            color = Color(0xFF555555),
+                            lineHeight = 24.sp
+                        )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 저장 완료 메시지
+            if (savedToCloset) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFE8F5E9))
+                        .padding(14.dp)
+                ) {
+                    Text(
+                        "✅ 옷장에 저장됐어요!",
+                        color = Color(0xFF4CAF50),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            if (savedToWishlist) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFFFF8E1))
+                        .padding(14.dp)
+                ) {
+                    Text(
+                        "⭐ 찜칸에 등록됐어요!",
+                        color = Color(0xFFF9A825),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // 저장 버튼들
+            if (viewModel.isAnalysisFinished && viewModel.isClothing && (!savedToCloset || !savedToWishlist)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (!savedToCloset) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(54.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFF2E1F1A))
+                                .clickable(enabled = !viewModel.isSaving) {
+                                    viewModel.saveToCloset(bitmap, viewModel.resultText) { success ->
+                                        if (success) savedToCloset = true
+                                        else Toast.makeText(context, "저장 실패.", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                if (viewModel.isSaving) "저장 중..." else "👕 옷장 저장",
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    if (!savedToWishlist) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(54.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFFEDE0D8))
+                                .clickable(enabled = !viewModel.isSaving) {
+                                    viewModel.saveToWishlist(bitmap, viewModel.resultText) { success ->
+                                        if (success) savedToWishlist = true
+                                        else Toast.makeText(context, "추가 실패.", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                if (viewModel.isSaving) "처리 중..." else "⭐ 찜칸 등록",
+                                color = Color(0xFF2E1F1A),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
 
-@Composable //앱 등장 화면
-fun MainScreen(onNavigateToCloset: () -> Unit, onNavigateToAnalyze: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 기존의 분석 시작 버튼 등 중앙 배치 코드...
-        Column(modifier = Modifier.align(Alignment.Center)) {
-            Button(onClick = onNavigateToAnalyze) {
-                Text("새 옷 등록하기")
-            }
-        }
-
-        // 왼쪽 하단에 옷장 버튼 추가
-        Button(
-            onClick = onNavigateToCloset,
+@Composable
+fun MainScreen(onNavigate: (Int) -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFAF7F4))
+    ) {
+        Column(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp)
+                .fillMaxSize()
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Text("내 옷장 👕")
+            // 헤더
+            Text(
+                text = "✦ My Closet",
+                fontSize = 13.sp,
+                letterSpacing = 3.sp,
+                color = Color(0xFFB07A6E),
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "오늘은\n뭐 입지?",
+                fontSize = 38.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF2E1F1A),
+                lineHeight = 46.sp
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // 메인 추천 버튼 (크게)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFF2E1F1A))
+                    .clickable { onNavigate(4) },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text("✨", fontSize = 22.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            "오늘 코디 추천",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            "AI가 날씨에 맞게 골라드려요",
+                            fontSize = 12.sp,
+                            color = Color(0xFFBBAA99)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 하단 3개 버튼 그리드
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // 내 옷장
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(100.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFFEDE0D8))
+                        .clickable { onNavigate(1) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("👕", fontSize = 26.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "내 옷장",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF2E1F1A)
+                        )
+                    }
+                }
+                // 찜칸
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(100.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFFF5EBE0))
+                        .clickable { onNavigate(3) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("⭐", fontSize = 26.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "찜 목록",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF2E1F1A)
+                        )
+                    }
+                }
+                // 새 옷 등록
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(100.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFFD4C4BC))
+                        .clickable { onNavigate(2) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("📸", fontSize = 26.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "옷 등록",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF2E1F1A)
+                        )
+                    }
+                }
+            }
         }
     }
 }

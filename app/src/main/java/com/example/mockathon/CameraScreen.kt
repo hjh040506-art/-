@@ -1,0 +1,105 @@
+package com.example.mockathon
+
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.os.Build
+import android.provider.MediaStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.launch
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
+    var showSheet by remember { mutableStateOf(true) }
+    val sheetState = rememberModalBottomSheetState()
+
+    // 1. 갤러리 런처 (URI를 Bitmap으로 변환하는 로직 포함)
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val bitmap = if (Build.VERSION.SDK_INT < 28) {
+                MediaStore.Images.Media.getBitmap(context.contentResolver, it)
+            } else {
+                val source = ImageDecoder.createSource(context.contentResolver, it)
+                ImageDecoder.decodeBitmap(source)
+            }
+            capturedImage = bitmap
+            viewModel.analyzeImage(bitmap) // 갤러리 선택 후 Gemini 분석 시작
+        }
+    }
+
+    // 2. 카메라 런처
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            viewModel.selectedImage = bitmap
+            capturedImage = bitmap
+            // [추가] 사진을 찍자마자 Gemini 분석 시작!
+            viewModel.analyzeImage(bitmap)
+        }
+    }
+
+    if (capturedImage != null) {
+        // [중요] ResultView의 매개변수 이름이 'bitmap'과 'onClose'인지 확인하세요!
+        ResultView(
+            bitmap = capturedImage!!,
+            viewModel = viewModel,
+            onClose = {
+                capturedImage = null
+                viewModel.resetToInitial()
+                onBack()
+            }
+        )
+    } else if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showSheet = false
+                onBack()
+            },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 50.dp, top = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("새 옷 등록 방식 선택", fontSize = 18.sp)
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Button(onClick = { cameraLauncher.launch() }) {
+                        Text("사진 찍기")
+                    }
+                    Button(onClick = { galleryLauncher.launch("image/*") }) {
+                        Text("갤러리에서 선택")
+                    }
+                }
+            }
+        }
+    }
+}
