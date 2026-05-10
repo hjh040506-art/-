@@ -1,6 +1,7 @@
 package com.example.mockathon
 
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +11,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.mockathon.Const.GEMINI_API_KEY
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.segmentation.Segmentation
+import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import kotlinx.coroutines.launch
 
 class ClothingViewModel : ViewModel() {
@@ -20,10 +24,11 @@ class ClothingViewModel : ViewModel() {
     var resultText by mutableStateOf("분석 결과가 여기에 나타납니다.")
     var selectedImage by mutableStateOf<Bitmap?>(null)
 
-    // 날씨 상태
     var weatherInfo by mutableStateOf<WeatherInfo?>(null)
     var isWeatherLoading by mutableStateOf(false)
     var weatherError by mutableStateOf(false)
+
+    var isRemovingBackground by mutableStateOf(false)
 
     fun fetchWeather(lat: Double, lon: Double) {
         viewModelScope.launch {
@@ -35,7 +40,6 @@ class ClothingViewModel : ViewModel() {
         }
     }
 
-    // 503 오류 시 최대 3번 재시도 (1s → 2s → 4s)
     private suspend fun <T> retryOnServerError(maxRetries: Int = 3, block: suspend () -> T): T {
         var lastException: Exception? = null
         repeat(maxRetries) { attempt ->
@@ -60,6 +64,51 @@ class ClothingViewModel : ViewModel() {
     val isAnalysisFinished: Boolean get() = resultText != "분석 중..." && resultText.isNotEmpty()
     val isClothing: Boolean get() = !resultText.contains("이전", ignoreCase = true)
     val isError: Boolean get() = resultText.startsWith("에러 발생:")
+
+    // ── 누끼 따기 + 분석 ──
+    fun removeBackgroundAndAnalyze(bitmap: Bitmap) {
+        isRemovingBackground = true
+        resultText = "배경 제거 중..."
+
+        val options = SelfieSegmenterOptions.Builder()
+            .setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
+            .enableRawSizeMask()
+            .build()
+        val segmenter = Segmentation.getClient(options)
+        val inputImage = InputImage.fromBitmap(bitmap, 0)
+
+        segmenter.process(inputImage)
+            .addOnSuccessListener { segmentationMask ->
+                val mask = segmentationMask.buffer
+                val maskWidth = segmentationMask.width
+                val maskHeight = segmentationMask.height
+
+                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, maskWidth, maskHeight, true)
+                val resultBitmap = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ARGB_8888)
+
+                mask.rewind()
+                for (y in 0 until maskHeight) {
+                    for (x in 0 until maskWidth) {
+                        val confidence = mask.float
+                        val alpha = (confidence * 255).toInt().coerceIn(0, 255)
+                        val pixel = scaledBitmap.getPixel(x, y)
+                        resultBitmap.setPixel(
+                            x, y,
+                            Color.argb(alpha, Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+                        )
+                    }
+                }
+
+                isRemovingBackground = false
+                selectedImage = resultBitmap
+                analyzeImage(resultBitmap)
+            }
+            .addOnFailureListener {
+                Log.e("ViewModel", "누끼 실패 → 원본으로 폴백", it)
+                isRemovingBackground = false
+                analyzeImage(bitmap)
+            }
+    }
 
     fun analyzeImage(bitmap: Bitmap) {
         selectedImage = bitmap
@@ -139,7 +188,6 @@ class ClothingViewModel : ViewModel() {
         )
     }
 
-    // Storage + Firestore 동시 삭제 (closet)
     fun deleteClothes(
         ids: Set<String>,
         itemsSnapshot: List<Map<String, Any>>,
@@ -161,7 +209,6 @@ class ClothingViewModel : ViewModel() {
         }
     }
 
-    // Storage + Firestore 동시 삭제 (wishlist)
     fun deleteWishlist(
         ids: Set<String>,
         itemsSnapshot: List<Map<String, Any>>,
@@ -183,18 +230,15 @@ class ClothingViewModel : ViewModel() {
         }
     }
 
-    // ── 코디 추천 ──
     fun getOutfitRecommendation(
         category: String,
         onResult: (OutfitRecommendation?, String?) -> Unit
     ) {
         viewModelScope.launch {
-            // 옷장 + 찜칸 동시 로드
             repository.getAllClothes(
                 onResult = { closetClothes ->
                     repository.getWishlist(
                         onResult = { wishlistClothes ->
-                            // 중복 id 제거 후 합치기
                             val allIds = closetClothes.map { it["id"] }.toSet()
                             val uniqueWishlist = wishlistClothes.filter { it["id"] !in allIds }
                             val allClothes = closetClothes + uniqueWishlist
@@ -213,7 +257,6 @@ class ClothingViewModel : ViewModel() {
                                 "반바지", "레깅스", "하의", "팬츠", "데님"
                             )
 
-                            // 계절 카테고리 코드에서 먼저 필터링
                             val seasonKeywords = when (category) {
                                 "여름" -> listOf("여름", "반팔", "민소매", "린넨", "반바지", "쇼츠")
                                 "겨울" -> listOf("겨울", "패딩", "코트", "두꺼운", "기모", "니트", "긴팔")
@@ -235,7 +278,6 @@ class ClothingViewModel : ViewModel() {
                                 bottomKeywords.any { tags.contains(it) } && matchesSeason(tags)
                             }
 
-                            // 계절 필터 결과 없으면 전체 폴백
                             if (tops.isEmpty()) tops = allClothes.filter { item ->
                                 val tags = item["tags"]?.toString() ?: ""
                                 topKeywords.any { tags.contains(it) }
@@ -279,7 +321,6 @@ class ClothingViewModel : ViewModel() {
                                 [오늘의 날씨]
                                 $weatherContext
                                 날씨와 기온을 반드시 고려해서 추천해줘.
-                                예를 들어 더우면 얇은 옷, 추우면 두꺼운 옷, 비가 오면 방수 소재 등을 우선해.
                                 
                                 [상의 목록]
                                 $topList
@@ -333,14 +374,10 @@ class ClothingViewModel : ViewModel() {
                                 }
                             }
                         },
-                        onError = {
-                            onResult(null, "찜칸 데이터를 불러오지 못했어요.\n네트워크 연결을 확인해주세요.")
-                        }
+                        onError = { onResult(null, "찜칸 데이터를 불러오지 못했어요.\n네트워크 연결을 확인해주세요.") }
                     )
                 },
-                onError = {
-                    onResult(null, "옷장 데이터를 불러오지 못했어요.\n네트워크 연결을 확인해주세요.")
-                }
+                onError = { onResult(null, "옷장 데이터를 불러오지 못했어요.\n네트워크 연결을 확인해주세요.") }
             )
         }
     }

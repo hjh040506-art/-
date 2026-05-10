@@ -14,7 +14,7 @@ class ClosetRepository {
 
     fun saveToFirebase(bitmap: Bitmap, tags: String, collectionName: String, onComplete: (Boolean) -> Unit) {
         val data = compressBitmap(bitmap)
-        val storageRef = storage.reference.child("$collectionName/${UUID.randomUUID()}.jpg")
+        val storageRef = storage.reference.child("$collectionName/${UUID.randomUUID()}.png")  // ✅ png로 변경
 
         storageRef.putBytes(data)
             .addOnSuccessListener {
@@ -87,7 +87,6 @@ class ClosetRepository {
             }
     }
 
-    // Storage 이미지 먼저 삭제 → Firestore 문서 삭제
     fun deleteItem(
         collectionName: String,
         docId: String,
@@ -104,7 +103,6 @@ class ClosetRepository {
                     deleteFirestoreDoc(collectionName, docId, onComplete)
                 }
                 .addOnFailureListener { e ->
-                    // Storage 삭제 실패해도 Firestore는 삭제 (고아 문서 방지)
                     Log.w("Repository", "Storage 삭제 실패, Firestore는 계속 삭제: $imageUrl", e)
                     deleteFirestoreDoc(collectionName, docId, onComplete)
                 }
@@ -129,7 +127,7 @@ class ClosetRepository {
 
     private fun compressBitmap(bitmap: Bitmap): ByteArray {
         val baos = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos)
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)  // ✅ 투명 배경 보존
         return baos.toByteArray()
     }
 }

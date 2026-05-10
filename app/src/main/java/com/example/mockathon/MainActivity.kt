@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,8 +60,8 @@ class MainActivity : ComponentActivity() {
                     viewModel = viewModel,
                     onBack = { currentScreen = 0 },
                     onItemClick = { item ->
-                        selectedItem = item          // ✅ 아이템 저장
-                        currentScreen = 5            // ✅ DetailView로 이동
+                        selectedItem = item
+                        currentScreen = 5
                     }
                 )
                 2 -> CameraScreen(
@@ -76,15 +76,14 @@ class MainActivity : ComponentActivity() {
                     viewModel = viewModel,
                     onBack = { currentScreen = 0 }
                 )
-                5 -> DetailView(                     // ✅ 상세 화면 추가
+                5 -> DetailView(
                     item = selectedItem!!,
-                    onBack = { currentScreen = 1 }   // ✅ 뒤로가면 옷장으로 복귀
+                    onBack = { currentScreen = 1 }
                 )
             }
         }
     }
 }
-
 
 @Composable
 fun ClothingScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
@@ -109,7 +108,7 @@ fun InitialView(viewModel: ClothingViewModel, onBack: () -> Unit) {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
             val bitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, it)
-            viewModel.analyzeImage(bitmap)
+            viewModel.removeBackgroundAndAnalyze(bitmap)  // ✅ 누끼 후 분석
         }
     }
     Box(
@@ -118,7 +117,7 @@ fun InitialView(viewModel: ClothingViewModel, onBack: () -> Unit) {
             .background(Color(0xFF996666))
             .padding(16.dp)
     ) {
-        Button(
+        androidx.compose.material3.Button(
             onClick = onBack,
             modifier = Modifier.align(Alignment.TopStart)
         ) {
@@ -135,7 +134,7 @@ fun InitialView(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
-            Button(
+            androidx.compose.material3.Button(
                 onClick = { launcher.launch("image/*") },
                 modifier = Modifier.size(width = 200.dp, height = 100.dp)
             ) {
@@ -160,7 +159,6 @@ fun ResultView(
             .fillMaxSize()
             .background(Color(0xFFFAF7F4))
     ) {
-        // 상단 바
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -196,7 +194,6 @@ fun ResultView(
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 사진 카드
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -208,13 +205,12 @@ fun ResultView(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = "선택된 옷 사진",
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    contentScale = ContentScale.Crop
                 )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 분석 결과 카드
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -223,6 +219,21 @@ fun ResultView(
                     .padding(20.dp)
             ) {
                 when {
+                    viewModel.isRemovingBackground -> {          // ✅ 배경 제거 로딩
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFFB07A6E),
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("배경 제거 중...", fontSize = 15.sp, color = Color(0xFF888888))
+                        }
+                    }
                     viewModel.isAnalyzing -> {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -235,52 +246,27 @@ fun ResultView(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                "AI가 분석 중이에요...",
-                                fontSize = 15.sp,
-                                color = Color(0xFF888888)
-                            )
+                            Text("AI가 분석 중이에요...", fontSize = 15.sp, color = Color(0xFF888888))
                         }
                     }
                     viewModel.isError -> {
-                        Text(
-                            text = viewModel.resultText,
-                            color = Color(0xFFCC5555),
-                            fontSize = 14.sp
-                        )
+                        Text(text = viewModel.resultText, color = Color(0xFFCC5555), fontSize = 14.sp)
                     }
                     viewModel.isAnalysisFinished && viewModel.isClothing -> {
                         Column {
-                            Text(
-                                text = "✦ 분석 완료",
-                                fontSize = 12.sp,
-                                letterSpacing = 2.sp,
-                                color = Color(0xFFB07A6E),
-                                fontWeight = FontWeight.Medium
-                            )
+                            Text("✦ 분석 완료", fontSize = 12.sp, letterSpacing = 2.sp, color = Color(0xFFB07A6E), fontWeight = FontWeight.Medium)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = viewModel.resultText,
-                                fontSize = 15.sp,
-                                color = Color(0xFF2E1F1A),
-                                lineHeight = 24.sp
-                            )
+                            Text(text = viewModel.resultText, fontSize = 15.sp, color = Color(0xFF2E1F1A), lineHeight = 24.sp)
                         }
                     }
                     viewModel.isAnalysisFinished && !viewModel.isClothing -> {
-                        Text(
-                            text = viewModel.resultText,
-                            fontSize = 15.sp,
-                            color = Color(0xFF555555),
-                            lineHeight = 24.sp
-                        )
+                        Text(text = viewModel.resultText, fontSize = 15.sp, color = Color(0xFF555555), lineHeight = 24.sp)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 저장 완료 메시지
             if (savedToCloset) {
                 Box(
                     modifier = Modifier
@@ -289,12 +275,7 @@ fun ResultView(
                         .background(Color(0xFFE8F5E9))
                         .padding(14.dp)
                 ) {
-                    Text(
-                        "✅ 옷장에 저장됐어요!",
-                        color = Color(0xFF4CAF50),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text("✅ 옷장에 저장됐어요!", color = Color(0xFF4CAF50), fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -306,17 +287,11 @@ fun ResultView(
                         .background(Color(0xFFFFF8E1))
                         .padding(14.dp)
                 ) {
-                    Text(
-                        "⭐ 찜칸에 등록됐어요!",
-                        color = Color(0xFFF9A825),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text("⭐ 찜칸에 등록됐어요!", color = Color(0xFFF9A825), fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // 저장 버튼들
             if (viewModel.isAnalysisFinished && viewModel.isClothing && (!savedToCloset || !savedToWishlist)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -339,9 +314,7 @@ fun ResultView(
                         ) {
                             Text(
                                 if (viewModel.isSaving) "저장 중..." else "👕 옷장 저장",
-                                color = Color.White,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
+                                color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -362,9 +335,7 @@ fun ResultView(
                         ) {
                             Text(
                                 if (viewModel.isSaving) "처리 중..." else "⭐ 찜칸 등록",
-                                color = Color(0xFF2E1F1A),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
+                                color = Color(0xFF2E1F1A), fontSize = 15.sp, fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -390,26 +361,12 @@ fun MainScreen(onNavigate: (Int) -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // 헤더
-            Text(
-                text = "✦ My Closet",
-                fontSize = 13.sp,
-                letterSpacing = 3.sp,
-                color = Color(0xFFB07A6E),
-                fontWeight = FontWeight.Medium
-            )
+            Text(text = "✦ My Closet", fontSize = 13.sp, letterSpacing = 3.sp, color = Color(0xFFB07A6E), fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "오늘은\n뭐 입지?",
-                fontSize = 38.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF2E1F1A),
-                lineHeight = 46.sp
-            )
+            Text(text = "오늘은\n뭐 입지?", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E1F1A), lineHeight = 46.sp)
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // 메인 추천 버튼 (크게)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -419,96 +376,47 @@ fun MainScreen(onNavigate: (Int) -> Unit) {
                     .clickable { onNavigate(4) },
                 contentAlignment = Alignment.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     Text("✨", fontSize = 22.sp)
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text(
-                            "오늘 코디 추천",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            "AI가 날씨에 맞게 골라드려요",
-                            fontSize = 12.sp,
-                            color = Color(0xFFBBAA99)
-                        )
+                        Text("오늘 코디 추천", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("AI가 날씨에 맞게 골라드려요", fontSize = 12.sp, color = Color(0xFFBBAA99))
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 하단 3개 버튼 그리드
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // 내 옷장
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(100.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFFEDE0D8))
-                        .clickable { onNavigate(1) },
+                    modifier = Modifier.weight(1f).height(100.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFFEDE0D8)).clickable { onNavigate(1) },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("👕", fontSize = 26.sp)
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "내 옷장",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF2E1F1A)
-                        )
+                        Text("내 옷장", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF2E1F1A))
                     }
                 }
-                // 찜칸
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(100.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFFF5EBE0))
-                        .clickable { onNavigate(3) },
+                    modifier = Modifier.weight(1f).height(100.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFFF5EBE0)).clickable { onNavigate(3) },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("⭐", fontSize = 26.sp)
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "찜 목록",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF2E1F1A)
-                        )
+                        Text("찜 목록", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF2E1F1A))
                     }
                 }
-                // 새 옷 등록
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(100.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFFD4C4BC))
-                        .clickable { onNavigate(2) },
+                    modifier = Modifier.weight(1f).height(100.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFFD4C4BC)).clickable { onNavigate(2) },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("📸", fontSize = 26.sp)
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "옷 등록",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF2E1F1A)
-                        )
+                        Text("옷 등록", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF2E1F1A))
                     }
                 }
             }

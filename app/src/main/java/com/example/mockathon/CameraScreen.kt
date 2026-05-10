@@ -38,7 +38,6 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     var showSheet by remember { mutableStateOf(true) }
     val sheetState = rememberModalBottomSheetState()
 
-    // 1. 갤러리 런처 (URI를 Bitmap으로 변환하는 로직 포함)
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -50,24 +49,20 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 ImageDecoder.decodeBitmap(source)
             }
             capturedImage = bitmap
-            viewModel.analyzeImage(bitmap) // 갤러리 선택 후 Gemini 분석 시작
+            viewModel.removeBackgroundAndAnalyze(bitmap)  // ✅ 누끼 후 분석
         }
     }
 
-    // 2. 카메라 런처
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
-            viewModel.selectedImage = bitmap
             capturedImage = bitmap
-            // [추가] 사진을 찍자마자 Gemini 분석 시작!
-            viewModel.analyzeImage(bitmap)
+            viewModel.removeBackgroundAndAnalyze(bitmap)  // ✅ 누끼 후 분석
         }
     }
 
     if (capturedImage != null) {
-        // [중요] ResultView의 매개변수 이름이 'bitmap'과 'onClose'인지 확인하세요!
         ResultView(
             bitmap = capturedImage!!,
             viewModel = viewModel,
@@ -91,7 +86,10 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
             ) {
                 Text("새 옷 등록 방식 선택", fontSize = 18.sp)
                 Spacer(modifier = Modifier.height(20.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
                     Button(onClick = { cameraLauncher.launch() }) {
                         Text("사진 찍기")
                     }
