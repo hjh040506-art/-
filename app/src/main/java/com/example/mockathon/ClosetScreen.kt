@@ -45,12 +45,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
-val STYLE_FILTERS = listOf("전체", "캐주얼", "스트릿", "빈티지", "오피스룩", "스포츠", "포멀", "미니멀")
 val SEASON_FILTERS = listOf("전체", "봄", "여름", "가을", "겨울")
 
 fun matchesFilter(tags: String, styleFilter: String, seasonFilter: String): Boolean {
     val lowerTags = tags.lowercase()
-    val styleMatch = if (styleFilter == "전체") true else lowerTags.contains(styleFilter.lowercase())
+    val styleMatch = if (styleFilter == "전체") true else {
+        val line4 = tags.lines().getOrNull(3)?.lowercase() ?: ""
+        line4.contains(styleFilter.lowercase())
+    }
     val seasonMatch = if (seasonFilter == "전체") true else lowerTags.contains(seasonFilter.lowercase())
     return styleMatch && seasonMatch
 }
@@ -69,7 +71,14 @@ fun ClosetScreen(
     var loadError by remember { mutableStateOf(false) }
     var selectedStyle by remember { mutableStateOf("전체") }
     var selectedSeason by remember { mutableStateOf("전체") }
-
+    val dynamicStyleFilters = remember(clothesList) {
+        val styles = clothesList.mapNotNull { item ->
+            val tags = item["tags"]?.toString() ?: ""
+            val line = tags.lines().getOrNull(3)  // 4번째 줄
+            line?.trim()?.replace("#", "")?.trim()?.takeIf { it.isNotEmpty() }
+        }.distinct()
+        listOf("전체") + styles
+    }
     LaunchedEffect(Unit) {
         viewModel.loadAllClothes(
             onResult = { clothesList = it },
@@ -158,7 +167,7 @@ fun ClosetScreen(
                 .background(Color.White)
                 .padding(vertical = 10.dp)
         ) {
-            FilterSection("스타일", STYLE_FILTERS, selectedStyle) { selectedStyle = it }
+            FilterSection("스타일", dynamicStyleFilters, selectedStyle) { selectedStyle = it }
             FilterSection("계절", SEASON_FILTERS, selectedSeason) { selectedSeason = it }
             if (selectedStyle != "전체" || selectedSeason != "전체") {
                 TextButton(
