@@ -48,12 +48,15 @@ import coil.compose.AsyncImage
 val SEASON_FILTERS = listOf("전체", "봄", "여름", "가을", "겨울")
 
 fun matchesFilter(tags: String, styleFilter: String, seasonFilter: String): Boolean {
-    val lowerTags = tags.lowercase()
     val styleMatch = if (styleFilter == "전체") true else {
-        val line4 = tags.lines().getOrNull(3)?.lowercase() ?: ""
-        line4.contains(styleFilter.lowercase())
+        val line4 = tags.lines().getOrNull(3) ?: ""
+        line4.split("#")
+            .map { it.trim().lowercase() }
+            .any { it == styleFilter.lowercase() }
     }
-    val seasonMatch = if (seasonFilter == "전체") true else lowerTags.contains(seasonFilter.lowercase())
+    val seasonMatch = if (seasonFilter == "전체") true else {
+        tags.lowercase().contains(seasonFilter.lowercase())
+    }
     return styleMatch && seasonMatch
 }
 
@@ -72,10 +75,12 @@ fun ClosetScreen(
     var selectedStyle by remember { mutableStateOf("전체") }
     var selectedSeason by remember { mutableStateOf("전체") }
     val dynamicStyleFilters = remember(clothesList) {
-        val styles = clothesList.mapNotNull { item ->
+        val styles = clothesList.flatMap { item ->
             val tags = item["tags"]?.toString() ?: ""
-            val line = tags.lines().getOrNull(3)  // 4번째 줄
-            line?.trim()?.replace("#", "")?.trim()?.takeIf { it.isNotEmpty() }
+            val line = tags.lines().getOrNull(3) ?: ""
+            line.split("#")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
         }.distinct()
         listOf("전체") + styles
     }
