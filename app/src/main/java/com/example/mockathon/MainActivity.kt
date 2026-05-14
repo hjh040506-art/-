@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -55,6 +56,14 @@ class MainActivity : ComponentActivity() {
             var currentScreen by remember { mutableStateOf(0) }
             var selectedItem by remember { mutableStateOf<Map<String, Any>?>(null) }
 
+            // ✅ 뒤로가기 버튼 처리
+            BackHandler(enabled = currentScreen != 0) {
+                when (currentScreen) {
+                    5 -> currentScreen = 1  // 상세화면 → 옷장
+                    else -> currentScreen = 0  // 나머지 → 메인
+                }
+            }
+
             when (currentScreen) {
                 0 -> MainScreen(onNavigate = { currentScreen = it })
                 1 -> ClosetScreen(
@@ -85,6 +94,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 
 @Composable
 fun ClothingScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
