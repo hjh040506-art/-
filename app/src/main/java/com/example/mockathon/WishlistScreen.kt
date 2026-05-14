@@ -4,9 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -30,6 +32,7 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var loadError by remember { mutableStateOf(false) }
     var deleteErrorMessage by remember { mutableStateOf<String?>(null) }
+    var selectedStyle by remember { mutableStateOf("전체") }
 
     fun refreshWishlist() {
         viewModel.loadWishlist(
@@ -40,7 +43,21 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
 
     LaunchedEffect(Unit) { refreshWishlist() }
 
-    // 삭제 실패 다이얼로그
+    // ✅ 찜칸 동적 스타일 필터
+    val dynamicStyleFilters = remember(wishlistItems) {
+        val styles = wishlistItems.flatMap { item ->
+            val tags = item["tags"]?.toString() ?: ""
+            val line = tags.lines().getOrNull(3) ?: ""
+            line.split("#").map { it.trim() }.filter { it.isNotEmpty() }
+        }.distinct()
+        listOf("전체") + styles
+    }
+
+    val filteredList = wishlistItems.filter { item ->
+        val tags = item["tags"]?.toString() ?: ""
+        matchesFilter(tags, selectedStyle, "전체")
+    }
+
     deleteErrorMessage?.let { msg ->
         AlertDialog(
             onDismissRequest = { deleteErrorMessage = null },
@@ -50,12 +67,11 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
         )
     }
 
-    // 삭제 확인 다이얼로그
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("삭제할까요?", fontWeight = FontWeight.Bold) },
-            text = { Text("선택한 ${selectedIds.size}개의 아이템을 삭제합니다.") },
+            text = { Text("선택한 ${selectedIds.size}개의 항목을 삭제합니다.") },
             confirmButton = {
                 Box(
                     modifier = Modifier
@@ -67,7 +83,7 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                 isEditMode = false
                                 selectedIds = emptySet()
                                 showDeleteDialog = false
-                                if (failCount > 0) deleteErrorMessage = "${failCount}개 삭제에 실패했어요."
+                                if (failCount > 0) deleteErrorMessage = "${failCount}개 삭제 실패"
                             }
                         }
                         .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -102,15 +118,7 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 Text("←", fontSize = 18.sp, color = Color(0xFF2E1F1A))
             }
             Spacer(modifier = Modifier.width(14.dp))
-            Text(
-                "찜 목록",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF2E1F1A),
-                modifier = Modifier.weight(1f)
-            )
-
-            // 삭제 모드 버튼들
+            Text("찜 목록", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E1F1A), modifier = Modifier.weight(1f))
             if (isEditMode) {
                 if (selectedIds.isNotEmpty()) {
                     Box(
@@ -146,6 +154,56 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
             }
         }
 
+        // ✅ 스타일 필터
+        if (dynamicStyleFilters.size > 1) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .padding(vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "스타일", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        color = Color(0xFFB07A6E), letterSpacing = 1.sp,
+                        modifier = Modifier.padding(start = 16.dp, end = 10.dp)
+                    )
+                    LazyRow(
+                        contentPadding = PaddingValues(end = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(dynamicStyleFilters) { filter ->
+                            val isSelected = selectedStyle == filter
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSelected) Color(0xFF2E1F1A) else Color(0xFFF5EEE9))
+                                    .clickable { selectedStyle = filter }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    filter, fontSize = 12.sp,
+                                    color = if (isSelected) Color.White else Color(0xFF888888),
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+                if (selectedStyle != "전체") {
+                    TextButton(
+                        onClick = { selectedStyle = "전체" },
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    ) {
+                        Text("✕ 필터 초기화", fontSize = 12.sp, color = Color(0xFFB07A6E))
+                    }
+                }
+            }
+        }
+
         // 콘텐츠
         when {
             loadError -> {
@@ -153,12 +211,7 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("⚠️", fontSize = 48.sp)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            "찜 목록을 불러오지 못했어요.\n네트워크를 확인해주세요.",
-                            fontSize = 15.sp,
-                            color = Color(0xFF888888),
-                            textAlign = TextAlign.Center
-                        )
+                        Text("찜 목록을 불러오지 못했어요.\n네트워크를 확인해주세요.", fontSize = 15.sp, color = Color(0xFF888888), textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(16.dp))
                         Box(
                             modifier = Modifier
@@ -170,19 +223,34 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                     }
                 }
             }
-
             wishlistItems.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("⭐", fontSize = 52.sp)
                         Spacer(modifier = Modifier.height(14.dp))
-                        Text("아직 찜한 아이템이 없어요", fontSize = 16.sp, color = Color(0xFF888888))
+                        Text("아직 찜한 옷이 없어요", fontSize = 16.sp, color = Color(0xFF888888))
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("마음에 드는 옷을 찜칸에 추가해보세요", fontSize = 13.sp, color = Color(0xFFBBBBBB))
+                        Text("마음에 드는 옷을 찜해보세요", fontSize = 13.sp, color = Color(0xFFBBBBBB))
                     }
                 }
             }
-
+            filteredList.isEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🔍", fontSize = 48.sp)
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text("해당 조건의 옷이 없어요", fontSize = 16.sp, color = Color(0xFF888888))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFFEDE0D8))
+                                .clickable { selectedStyle = "전체" }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
+                        ) { Text("필터 초기화", color = Color(0xFF2E1F1A), fontWeight = FontWeight.Medium) }
+                    }
+                }
+            }
             else -> {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
@@ -190,7 +258,7 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(wishlistItems) { item ->
+                    items(filteredList) { item ->
                         val itemId = item["id"] as? String ?: ""
                         val imageUrl = item["imageUrl"] as? String ?: ""
                         val tags = item["tags"] as? String ?: ""
@@ -218,7 +286,7 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                         contentScale = ContentScale.FillWidth
                                     )
                                     if (isEditMode && isSelected) {
-                                        Box(modifier = Modifier.fillMaxSize().background(Color(0x55B07A6E)))
+                                        Box(modifier = Modifier.matchParentSize().background(Color(0x55B07A6E)))
                                     }
                                 }
                                 Box(modifier = Modifier.padding(10.dp)) {
@@ -231,8 +299,6 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                     )
                                 }
                             }
-
-                            // 체크 뱃지
                             if (isEditMode) {
                                 Box(
                                     modifier = Modifier
@@ -244,9 +310,7 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                         .align(Alignment.TopEnd),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (isSelected) {
-                                        Text("✓", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                                    }
+                                    if (isSelected) Text("✓", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

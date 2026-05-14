@@ -268,22 +268,28 @@ class ClothingViewModel : ViewModel() {
 
     fun getOutfitRecommendation(
         category: String,
-        sleeveType: String?,   // ✅ "긴팔" | "반팔" | null
-        pantsType: String?,    // ✅ "긴바지" | "반바지" | null
+        sleeveType: String?,
+        pantsType: String?,
+        includeWishlist: Boolean = false,   // ✅ 추가
         onResult: (OutfitRecommendation?, String?) -> Unit
     ) {
         viewModelScope.launch {
             repository.getAllClothes(
                 onResult = { closetClothes ->
-                    repository.getWishlist(
-                        onResult = { wishlistClothes ->
+                    // ✅ includeWishlist가 true일 때만 찜칸 로드
+                    val loadWishlist: (onResult: (List<Map<String, Any>>) -> Unit, onError: ((Exception) -> Unit)?) -> Unit =
+                        if (includeWishlist) repository::getWishlist
+                        else { onResult, _ -> onResult(emptyList()) }
+
+                    loadWishlist(
+                        { wishlistClothes ->
                             val allIds = closetClothes.map { it["id"] }.toSet()
                             val uniqueWishlist = wishlistClothes.filter { it["id"] !in allIds }
                             val allClothes = closetClothes + uniqueWishlist
 
                             if (allClothes.isEmpty()) {
-                                onResult(null, "옷장과 찜칸이 모두 비어있어요!\n먼저 옷을 등록해주세요.")
-                                return@getWishlist
+                                onResult(null, "옷장이 비어있어요!\n먼저 옷을 등록해주세요.")
+                                return@loadWishlist
                             }
 
                             val topKeywords = listOf(
@@ -325,18 +331,28 @@ class ClothingViewModel : ViewModel() {
                                 bottomKeywords.any { tags.contains(it) }
                             }
 
+                            // ✅ 슬리브/팬츠 타입 필터링
+                            if (sleeveType != null) {
+                                val filtered = tops.filter { it["tags"]?.toString()?.contains(sleeveType) == true }
+                                if (filtered.isNotEmpty()) tops = filtered
+                            }
+                            if (pantsType != null) {
+                                val filtered = bottoms.filter { it["tags"]?.toString()?.contains(pantsType) == true }
+                                if (filtered.isNotEmpty()) bottoms = filtered
+                            }
+
                             when {
                                 tops.isEmpty() && bottoms.isEmpty() -> {
                                     onResult(null, "상의와 하의가 모두 없어요.\n옷을 더 등록해주세요!")
-                                    return@getWishlist
+                                    return@loadWishlist
                                 }
                                 tops.isEmpty() -> {
                                     onResult(null, "상의로 인식된 옷이 없어요.\n티셔츠, 셔츠, 니트 등을 등록해보세요!")
-                                    return@getWishlist
+                                    return@loadWishlist
                                 }
                                 bottoms.isEmpty() -> {
                                     onResult(null, "하의로 인식된 옷이 없어요.\n바지, 치마, 청바지 등을 등록해보세요!")
-                                    return@getWishlist
+                                    return@loadWishlist
                                 }
                             }
 
@@ -356,28 +372,28 @@ class ClothingViewModel : ViewModel() {
                             val pantsContext = pantsType?.let { "하의는 반드시 $it 이어야 해." } ?: ""
 
                             val prompt = """
-                                    너는 패션 코디 전문가야.
-                                    아래 옷 목록에서 "$category" 스타일에 가장 잘 어울리는 상의 1개와 하의 1개를 골라줘.
-                                    
-                                    [오늘의 날씨]
-                                    $weatherContext
-                                    날씨와 기온을 반드시 고려해서 추천해줘.
-                                    
-                                    [추가 조건]
-                                    $sleeveContext
-                                    $pantsContext
-                                    
-                                    [상의 목록]
-                                    $topList
-                                    
-                                    [하의 목록]
-                                    $bottomList
-                                    
-                                    반드시 아래 형식으로만 답해줘. 다른 말은 하지 마:
-                                    TOP_ID: (선택한 상의의 id값)
-                                    BOTTOM_ID: (선택한 하의의 id값)
-                                    REASON: (추천 이유를 2~3문장으로, 날씨 언급 포함해서 재치있고 친근하게)
-                                """.trimIndent()
+                            너는 패션 코디 전문가야.
+                            아래 옷 목록에서 "$category" 스타일에 가장 잘 어울리는 상의 1개와 하의 1개를 골라줘.
+                            
+                            [오늘의 날씨]
+                            $weatherContext
+                            날씨와 기온을 반드시 고려해서 추천해줘.
+                            
+                            [추가 조건]
+                            $sleeveContext
+                            $pantsContext
+                            
+                            [상의 목록]
+                            $topList
+                            
+                            [하의 목록]
+                            $bottomList
+                            
+                            반드시 아래 형식으로만 답해줘. 다른 말은 하지 마:
+                            TOP_ID: (선택한 상의의 id값)
+                            BOTTOM_ID: (선택한 하의의 id값)
+                            REASON: (추천 이유를 2~3문장으로, 날씨 언급 포함해서 재치있고 친근하게)
+                        """.trimIndent()
 
                             viewModelScope.launch {
                                 try {
@@ -419,11 +435,12 @@ class ClothingViewModel : ViewModel() {
                                 }
                             }
                         },
-                        onError = { onResult(null, "찜칸 데이터를 불러오지 못했어요.\n네트워크 연결을 확인해주세요.") }
+                        { onResult(null, "데이터를 불러오지 못했어요.\n네트워크 연결을 확인해주세요.") }
                     )
                 },
                 onError = { onResult(null, "옷장 데이터를 불러오지 못했어요.\n네트워크 연결을 확인해주세요.") }
             )
         }
     }
+
 }
