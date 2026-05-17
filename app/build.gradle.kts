@@ -28,6 +28,18 @@ android {
         }
         val apiKey = properties.getProperty("GEMINI_API_KEY") ?: ""
         buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
+
+        val weatherApiKey = properties.getProperty("OPENWEATHER_API_KEY") ?: ""
+        buildConfigField("String", "OPENWEATHER_API_KEY", "\"$weatherApiKey\"")
+        val localProps = Properties()
+        localProps.load(rootProject.file("local.properties").inputStream())
+
+        buildConfigField("String", "GEMINI_API_KEY_1", "\"${localProps["GEMINI_API_KEY_1"]}\"")
+        buildConfigField("String", "GEMINI_API_KEY_2", "\"${localProps["GEMINI_API_KEY_2"]}\"")
+        buildConfigField("String", "GEMINI_API_KEY_3", "\"${localProps["GEMINI_API_KEY_3"]}\"")
+        buildConfigField("String", "REMOVE_BG_API_KEY_1", "\"${localProps["REMOVE_BG_API_KEY_1"]}\"")
+        buildConfigField("String", "REMOVE_BG_API_KEY_2", "\"${localProps["REMOVE_BG_API_KEY_2"]}\"")
+        buildConfigField("String", "OPENWEATHER_API_KEY", "\"${localProps["OPENWEATHER_API_KEY"]}\"")
     }
 
     buildTypes {
@@ -52,6 +64,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
         buildConfig = true

@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import coil.compose.AsyncImage
 
 @Composable
@@ -33,6 +35,13 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     var loadError by remember { mutableStateOf(false) }
     var deleteErrorMessage by remember { mutableStateOf<String?>(null) }
     var selectedStyle by remember { mutableStateOf("전체") }
+    var selectedItem by remember { mutableStateOf<Map<String, Any>?>(null) }  // ✅ 상세보기용
+
+    // ✅ 상세보기 화면
+    selectedItem?.let { item ->
+        WishlistDetailView(item = item, onBack = { selectedItem = null })
+        return
+    }
 
     fun refreshWishlist() {
         viewModel.loadWishlist(
@@ -268,8 +277,12 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Color.White)
-                                .clickable(enabled = isEditMode) {
-                                    selectedIds = if (isSelected) selectedIds - itemId else selectedIds + itemId
+                                .clickable {
+                                    if (isEditMode) {
+                                        selectedIds = if (isSelected) selectedIds - itemId else selectedIds + itemId
+                                    } else {
+                                        selectedItem = item  // ✅ 상세보기 이동
+                                    }
                                 }
                         ) {
                             Column {
@@ -318,5 +331,90 @@ fun WishlistScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun WishlistDetailView(item: Map<String, Any>, onBack: () -> Unit) {
+    val tags = item["tags"]?.toString() ?: ""
+    val tagLines = tags.lines()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFAF7F4))
+            .verticalScroll(rememberScrollState())
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFEDE0D8))
+                    .clickable { onBack() },
+                contentAlignment = Alignment.Center
+            ) { Text("←", fontSize = 18.sp, color = Color(0xFF2E1F1A)) }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column {
+                Text("✦ WISHLIST", fontSize = 11.sp, letterSpacing = 2.sp, color = Color(0xFFB07A6E), fontWeight = FontWeight.Medium)
+                Text("찜한 옷 상세", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E1F1A))
+            }
+        }
+
+        // 이미지
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFFEDE0D8))
+        ) {
+            AsyncImage(
+                model = item["imageUrl"] as? String ?: "",
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth(),
+                contentScale = ContentScale.FillWidth
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 태그 카드
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF2E1F1A))
+                .padding(20.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("✦ 태그 정보", fontSize = 11.sp, letterSpacing = 1.sp, color = Color(0xFFB07A6E), fontWeight = FontWeight.Medium)
+                val labelList = listOf("종류", "색깔", "계절", "스타일")
+                tagLines.forEachIndexed { i, line ->
+                    if (line.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0x33FFFFFF))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = labelList.getOrElse(i) { "기타" },
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFB07A6E),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(line.trim(), fontSize = 14.sp, color = Color(0xFFEDE0D8), lineHeight = 22.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(40.dp))
     }
 }

@@ -78,6 +78,7 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     var selectedSleeve by remember { mutableStateOf<String?>(null) }
     var selectedPants by remember { mutableStateOf<String?>(null) }
     var includeWishlist by remember { mutableStateOf(false) }   // ✅ 찜칸 포함 토글
+    var selectedGender by remember { mutableStateOf("중성적") }  // ✅ 성별 선택
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -233,7 +234,45 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 스타일 카테고리
+            // ✅ 성별 선택
+            Text(
+                text = "성별",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF2E1F1A),
+                modifier = Modifier.padding(start = 20.dp, bottom = 10.dp)
+            )
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("남성", "여성", "중성적").forEach { gender ->
+                    val isSelected = selectedGender == gender
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isSelected) Color(0xFF2E1F1A) else Color(0xFFEDE0D8))
+                            .clickable {
+                                selectedGender = gender
+                                recommendation = null
+                            }
+                            .padding(horizontal = 18.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = when (gender) {
+                                "남성" -> "👨 남성"
+                                "여성" -> "👩 여성"
+                                else  -> "🧑 중성적"
+                            },
+                            color = if (isSelected) Color.White else Color(0xFF666666),
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = "어떤 스타일로 입을까요?",
                 fontSize = 15.sp,
@@ -424,7 +463,8 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                 category = it,
                                 sleeveType = selectedSleeve,
                                 pantsType = selectedPants,
-                                includeWishlist = includeWishlist   // ✅ 전달
+                                includeWishlist = includeWishlist,
+                                gender = selectedGender   // ✅ 성별 전달
                             ) { result, error ->
                                 isLoading = false
                                 recommendation = result
@@ -480,7 +520,8 @@ fun RecommendScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
                                 category = it,
                                 sleeveType = selectedSleeve,
                                 pantsType = selectedPants,
-                                includeWishlist = includeWishlist
+                                includeWishlist = includeWishlist,
+                                gender = selectedGender   // ✅ 성별 전달
                             ) { result, error ->
                                 isLoading = false
                                 recommendation = result

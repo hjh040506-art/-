@@ -1,12 +1,13 @@
 package com.example.mockathon
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +40,7 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
     var showSheet by remember { mutableStateOf(true) }
     val sheetState = rememberModalBottomSheetState()
+    var cameraUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -56,20 +60,29 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) {
-            capturedImage = bitmap
-            viewModel.removeBackgroundAndAnalyze(bitmap)
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            cameraUri?.let { uri ->
+                val bitmap = if (Build.VERSION.SDK_INT < 28) {
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                } else {
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    }
+                }
+                capturedImage = bitmap
+                viewModel.removeBackgroundAndAnalyze(bitmap)
+            }
         }
     }
 
-    // ✅ 누끼 완료 후 viewModel.selectedImage로 교체, 없으면 원본 사용
     val displayBitmap = viewModel.selectedImage ?: capturedImage
 
     if (displayBitmap != null) {
         ResultView(
-            bitmap = displayBitmap,  // ✅ 누끼 완료 이미지 전달
+            bitmap = displayBitmap,
             viewModel = viewModel,
             onClose = {
                 capturedImage = null
@@ -86,16 +99,26 @@ fun CameraScreen(viewModel: ClothingViewModel, onBack: () -> Unit) {
             sheetState = sheetState
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 50.dp, top = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 50.dp, top = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("새 옷 등록 방식 선택", fontSize = 18.sp)
+                Text("        새 옷 등록 방식 선택\n옷이 잘 보이게 찍어주세요👕!", fontSize = 18.sp)
                 Spacer(modifier = Modifier.height(20.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Button(onClick = { cameraLauncher.launch() }) {
+                    Button(onClick = {
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+                        )
+                        cameraUri = uri
+                        cameraLauncher.launch(uri)
+                    }) {
                         Text("사진 찍기")
                     }
                     Button(onClick = { galleryLauncher.launch("image/*") }) {

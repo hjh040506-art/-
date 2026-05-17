@@ -374,7 +374,7 @@ fun MainScreen(onNavigate: (Int) -> Unit) {
         ) {
             Text(text = "✦ My Closet", fontSize = 13.sp, letterSpacing = 3.sp, color = Color(0xFFB07A6E), fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "오늘은\n뭐 입지?", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E1F1A), lineHeight = 46.sp)
+            Text(text = "코디 포유", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E1F1A), lineHeight = 46.sp)
 
             Spacer(modifier = Modifier.height(48.dp))
 
